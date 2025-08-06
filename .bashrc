@@ -7,9 +7,13 @@ alias pfwl='git push --force-with-lease' # Does a force-with-lease push (Useful 
 alias pull='git pull'
 alias plr='git pull --rebase'
 alias status='git status'
+alias stash='git stash'
 alias pop='git stash pop'
 alias branch='git branch'
 alias list='git stash list'
+alias clear='git stash clear'
+alias undoall='git clean -df && git reset --hard && git checkout .'
+alias diff='git difftool -y -x vimdiff'
 alias setrc='source ~/.bashrc'
 alias editrc='vim ~/.bashrc'
 
@@ -32,15 +36,31 @@ pushnew() {
 # Takes 1 argument: New Branch Name (example: `new myNewBranch`)
 new() {
 	default_branch_name=$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's/origin\///')
+	## Add check for changes here
+	current_changes_count=$(git status --porcelain | wc -l)
+	has_stashed_changes=false
+
+	if [ "$current_changes_count" -gt 0 ]; then
+		echo -e "\e[1;35mStashing $current_changes_count change$([ "$current_changes_count" -gt 1 ] && echo "s")...\e[0m"
+		git add .
+		git stash
+		has_stashed_changes=true
+		echo ""
+	fi
 
 	echo -e "\e[1;35mSwitching to $default_branch_name...\e[0m"
 	git checkout $default_branch_name
 
-	echo -e "\e[1;35mPulling latest for $default_branch_name...\e[0m"
+	echo -e "\e[1;35mPulling latest from $default_branch_name...\e[0m"
 	git pull
 
 	echo -e "\e[1;35mCreating and switching to $1 from $default_branch_name...\e[0m"
 	git checkout -b $1 $default_branch_name --quiet
+	
+	if $has_stashed_changes; then
+		echo -e "\e[1;35mPopping $current_changes_count change$([ "$current_changes_count" -gt 1 ] && echo "s")...\e[0m"
+		git stash pop
+	fi
 }
 ########
 
@@ -141,7 +161,7 @@ latestpush() {
 		echo ""
 	fi
 
-	echo -e "\e[1;35mPushing $current_branch_name to GitHub...\e[0m"
+	echo -e "\e[1;35mPushing $current_branch_name to ADO...\e[0m"
 	git push --force-with-lease
 
 	if $has_stashed_changes; then
@@ -150,6 +170,15 @@ latestpush() {
 	fi
 }
 ########
+
+checkout() {
+	git checkout $1
+}
+
+bisect() {
+	cd $(git rev-parse --show-toplevel)
+	git bisect start
+}
 
 # Displays number of stash entries
 stashcount() {
@@ -201,32 +230,4 @@ mergelatest() {
 		echo -e "\e[1;35mPopping $current_changes_count change$([ "$current_changes_count" -gt 1 ] && echo "s")...\e[0m"
 		git stash pop
 	fi
-}
-########
-
-#rainbow() {
-#  text="$1"
-#  colors=("36" "35" "34" "33" "32" "31")
-#  for (( i=0; i<${#text}; i++ )); do
-#    color="${colors[$i % ${#colors[@]}]}"
-#    echo -en "\e[1;${color}m${text:i:1}\e[0m"
-#  done
-#}
-
-#blink() {
-#	count=3
-#	while [ $count -gt 0 ]; do
-#		for i in $(seq 1 $count); do
-#			echo -ne "."
-#			sleep 0.5
-#		done
-#		echo -ne "\r   \r"
-#	done
-#}
-
-# Function to display git commit history in a visually appealing way
-# Work in Progress
-function gitlog() {
-  echo -e "\e[1;35mCommit history:\e[0m"
-  git log --pretty=format:"%C(auto)%h %C(red)%cn %C(auto)%d %C(white)%s" --date=short -20 | sed -e "s/HEAD ->.*//g" | awk '{$1=$1};1' | tac | awk '{print NR".",$0}' | awk '{ if (NR%2 == 0) print "\033[38;5;141m"$0"\033[0m"; else print "\033[38;5;110m"$0"\033[0m"; }'
 }
